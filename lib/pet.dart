@@ -434,6 +434,38 @@ class PetNotifier extends StateNotifier<PetState> {
     print("Resetting pet state.");
     state = PetState(); // Create a new initial state
   }
+
+  // Method to update pet state after playing a mini-game
+  void updateAfterMiniGame({
+    required int happinessGained,
+    required int energyCost,
+  }) {
+    // Apply happiness and tiredness changes from mini-game
+    final int newHappiness = (state.happiness + happinessGained).clamp(0, 100);
+    final int newTiredness = (state.tiredness + energyCost).clamp(0, 100);
+
+    // Update state
+    state = state.copyWith(
+      happiness: newHappiness,
+      tiredness: newTiredness,
+      carePoints:
+          state.carePoints +
+          (happinessGained > 0
+              ? 1
+              : 0), // Gain a care point if game was successful
+    );
+
+    print(
+      "Mini-game results: Happiness +$happinessGained, Tiredness +$energyCost",
+    );
+
+    // Auto-sleep if extremely tired after playing
+    if (newTiredness > 95 && !state.isSleeping && !state.isSick) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        sleep();
+      });
+    }
+  }
 }
 
 // The provider that allows the UI to interact with the PetNotifier

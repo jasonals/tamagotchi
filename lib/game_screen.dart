@@ -3,6 +3,7 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:tamagotchi/pet.dart'; // Import PetState and provider
 import 'package:tamagotchi/pet_visual.dart'; // Import PetVisual
+import 'package:tamagotchi/mini_games.dart'; // Import mini-games
 import 'dart:async'; // For Timer
 
 // Helper to convert stat to qualitative description
@@ -414,6 +415,21 @@ class GameScreen extends HookConsumerWidget {
                                 ? toggleSleep
                                 : (sleepEnabled ? toggleSleep : null),
                         color: Colors.indigo,
+                      ),
+                      _buildActionButton(
+                        icon: Icons.sports_esports,
+                        label: 'Games',
+                        onPressed:
+                            actionsEnabled
+                                ? () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) =>
+                                            const MiniGameSelectionScreen(),
+                                  ),
+                                )
+                                : null,
+                        color: Colors.purple,
                       ),
                     ],
                   ),

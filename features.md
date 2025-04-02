@@ -4,13 +4,12 @@ This document outlines the features planned for the Virtual Pet game and tracks 
 
 ## Planned Features
 
-- [ ] Mini-games
 - [x] Customization options (pet appearance, environment)
 - [ ] Notifications for pet needs
 
 ## In Progress
 
-- [ ] ...
+- [ ] Mini-games
 
 ## Completed
 
@@ -22,3 +21,4 @@ This document outlines the features planned for the Virtual Pet game and tracks 
 - [x] Sickness mechanics
 - [x] Death/End state
 - [x] Care Points system for evolution
+- [x] Mini-games
