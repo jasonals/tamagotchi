@@ -18,7 +18,8 @@ class MyApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Add WidgetRef
     return MaterialApp(
-      title: 'Tamagotchi', // Changed title
+      title: 'Virtual Pet', // Changed title
+      debugShowCheckedModeBanner: false, // Remove debug banner
       theme: ThemeData(
         // This is the theme of your application.
         //
@@ -36,9 +37,33 @@ class MyApp extends ConsumerWidget {
         // This works for code too, not just values: Most code changes can be
         // tested with just a hot reload.
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-        ), // Changed seed color
+          seedColor: Colors.indigo,
+          brightness: Brightness.light,
+          primary: Colors.indigo,
+          secondary: Colors.amber,
+          tertiary: Colors.teal,
+        ),
         useMaterial3: true,
+        // Text theme
+        textTheme: const TextTheme(
+          titleLarge: TextStyle(fontWeight: FontWeight.bold, fontSize: 24),
+          bodyLarge: TextStyle(fontSize: 16),
+        ),
+        // Button theme
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ),
+        // AppBar theme
+        appBarTheme: const AppBarTheme(
+          centerTitle: true,
+          elevation: 0,
+          titleTextStyle: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        ),
       ),
       home: const GameScreen(), // Use GameScreen as home
     );

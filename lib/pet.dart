@@ -16,6 +16,7 @@ class PetState {
   final bool isAlive; // Add isAlive flag
   final int sickDuration; // Add sickness duration
   final int carePoints; // Add care points
+  final int tiredness; // Add tiredness attribute
 
   PetState({
     this.hunger = 50,
@@ -28,6 +29,7 @@ class PetState {
     this.isAlive = true, // Start alive
     this.sickDuration = 0, // Start not sick
     this.carePoints = 0, // Start with 0 care points
+    this.tiredness = 30, // Start with some tiredness (0-100 scale)
   });
 
   // Helper method to create a copy with updated values
@@ -42,6 +44,7 @@ class PetState {
     bool? isAlive, // Add isAlive
     int? sickDuration, // Add sickDuration
     int? carePoints, // Add carePoints
+    int? tiredness, // Add tiredness to copyWith
   }) {
     return PetState(
       hunger: hunger ?? this.hunger,
@@ -54,6 +57,7 @@ class PetState {
       isAlive: isAlive ?? this.isAlive, // Update copyWith
       sickDuration: sickDuration ?? this.sickDuration, // Update copyWith
       carePoints: carePoints ?? this.carePoints, // Update copyWith
+      tiredness: tiredness ?? this.tiredness, // Pass tiredness
     );
   }
 }
@@ -72,6 +76,9 @@ class PetNotifier extends StateNotifier<PetState> {
   static const int childCareThreshold = 5;
   static const int teenCareThreshold = 15;
   static const int adultCareThreshold = 30;
+
+  // Maximum tiredness before pet needs rest
+  static const int maxTirednessThreshold = 85;
 
   PetNotifier() : super(PetState());
   final _random = Random();
@@ -98,10 +105,15 @@ class PetNotifier extends StateNotifier<PetState> {
       message = "Fed the pet.";
     }
 
+    // Feeding takes a small amount of energy
+    int currentTiredness = state.tiredness;
+    currentTiredness = (currentTiredness + 2).clamp(0, 100);
+
     state = state.copyWith(
       hunger: currentHunger,
       happiness: currentHappiness,
       carePoints: currentCare,
+      tiredness: currentTiredness,
     );
     print(
       "$message H:${state.hunger} Ha:${state.happiness} C:${state.carePoints}",
@@ -130,10 +142,15 @@ class PetNotifier extends StateNotifier<PetState> {
       message = "Cleaned the pet.";
     }
 
+    // Cleaning takes a small amount of energy
+    int currentTiredness = state.tiredness;
+    currentTiredness = (currentTiredness + 5).clamp(0, 100);
+
     state = state.copyWith(
       cleanliness: currentCleanliness,
       happiness: currentHappiness,
       carePoints: currentCare,
+      tiredness: currentTiredness,
     );
     print(
       "$message Cl:${state.cleanliness} Ha:${state.happiness} C:${state.carePoints}",
@@ -143,48 +160,80 @@ class PetNotifier extends StateNotifier<PetState> {
   void play() {
     int currentHappiness = state.happiness;
     int currentCare = state.carePoints;
+    int currentTiredness = state.tiredness;
     String message;
-    int careGain = 0; // Initialize careGain here
 
-    if (currentHappiness >= 100) {
-      // Playing when max happiness
-      // careGain is already 0
-      message = "Pet is already super happy!";
+    // Check if the pet is too tired to play
+    if (currentTiredness >= maxTirednessThreshold) {
+      // If pet is very tired, playing hurts happiness and doesn't boost it
+      currentHappiness = (currentHappiness - 5).clamp(0, 100);
+      currentCare = (currentCare - 1).clamp(0, 1000);
+      // Still gets even more tired!
+      currentTiredness = (currentTiredness + 10).clamp(0, 100);
+      message = "Pet is too tired to play!";
     } else {
+      // Normal play behavior
       int happinessIncrease = 15;
-      careGain = 1; // Reset to base gain
+      int careGain = 1;
       if (currentHappiness < 40) {
         careGain = 2; // More points if sad
       }
       currentHappiness = (currentHappiness + happinessIncrease).clamp(0, 100);
       currentCare += careGain;
+
+      // Playing makes pet tired
+      currentTiredness = (currentTiredness + 15).clamp(0, 100);
+
       message = "Played with the pet.";
     }
 
     state = state.copyWith(
       happiness: currentHappiness,
-      carePoints:
-          currentCare, // Apply the final care points (could be 0 if max happiness)
+      carePoints: currentCare,
+      tiredness: currentTiredness,
     );
-    print("$message Ha:${state.happiness} C:${state.carePoints}");
+
+    // Auto-sleep if extremely tired
+    if (currentTiredness > 95 && !state.isSleeping && !state.isSick) {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        sleep();
+      });
+    }
+
+    print(
+      "$message Ha:${state.happiness} T:${state.tiredness} C:${state.carePoints}",
+    );
   }
 
   void sleep() {
     if (!state.isSleeping) {
       state = state.copyWith(isSleeping: true);
-      print("Pet is now sleeping.");
-      // Maybe add logic here: e.g., happiness increases slowly while sleeping?
+      print("Pet is now sleeping. Tiredness: ${state.tiredness}");
     }
   }
 
   void wakeUp() {
     if (state.isSleeping) {
+      // Penalty for waking up while still tired
+      int happinessPenalty = 0;
+      String message = "Pet woke up!";
+
+      if (state.tiredness > 50) {
+        happinessPenalty = 10; // Greater penalty if still tired
+        message = "Pet woke up too early and feels grumpy!";
+      } else if (state.tiredness > 20) {
+        happinessPenalty = 5; // Small penalty if somewhat tired
+        message = "Pet would have liked to sleep a bit more.";
+      }
+
       state = state.copyWith(
         isSleeping: false,
-        // Optional: Penalty for waking up?
-        happiness: (state.happiness - 5).clamp(0, 100),
+        happiness: (state.happiness - happinessPenalty).clamp(0, 100),
       );
-      print("Pet woke up! Happiness: ${state.happiness}");
+
+      print(
+        "$message Happiness: ${state.happiness}, Tiredness: ${state.tiredness}",
+      );
     }
   }
 
@@ -219,13 +268,31 @@ class PetNotifier extends StateNotifier<PetState> {
     if (_shouldDie()) {
       state = state.copyWith(isAlive: false);
       print("Oh no! The pet is gone... :(");
-      // Optional: Stop a timer if managed here (though managed in UI currently)
       return; // Stop processing this tick
     }
+
+    // --- Sickness Logic Update ---
+    bool currentlySick = state.isSick;
+    int currentSickDuration = state.sickDuration;
+
+    if (currentlySick) {
+      // If sick, increment duration
+      currentSickDuration++;
+      print("Pet has been sick for $currentSickDuration ticks.");
+    } else {
+      // Check if pet becomes sick this tick
+      if (_shouldGetSick()) {
+        currentlySick = true;
+        currentSickDuration = 1; // Start duration
+        print("Pet got sick!");
+      }
+    }
+    // --- End Sickness Logic Update ---
 
     // Increment age regardless of sleep/awake state
     int currentAge = state.age + 1;
     int currentCarePoints = state.carePoints;
+    int currentTiredness = state.tiredness;
     LifeStage currentStage = state.lifeStage;
 
     // Penalties for bad states - Scaled penalties
@@ -250,80 +317,61 @@ class PetNotifier extends StateNotifier<PetState> {
       currentCarePoints = (currentCarePoints - 1).clamp(0, 1000);
     }
 
-    // Check for evolution (Age AND Care Points)
+    // Auto-sleep when extremely tired (if not already sleeping or sick)
+    if (currentTiredness >= maxTirednessThreshold &&
+        !state.isSleeping &&
+        !state.isSick) {
+      print("Pet is exhausted, falling asleep automatically...");
+      sleep();
+      return; // Exit tick since pet is now sleeping
+    }
+
+    // Check for evolution
     LifeStage newStage = _getLifeStage(currentAge, currentCarePoints);
     if (newStage != currentStage) {
       print(
         "Pet evolved to ${newStage.name}! (Age: $currentAge, Care: $currentCarePoints)",
       );
       currentStage = newStage;
-      // Reset care points on evolution? Optional.
-      // currentCarePoints = 0;
     }
 
-    // --- Sickness Logic Update ---
-    bool currentlySick = state.isSick;
-    int currentSickDuration = state.sickDuration;
-
-    if (currentlySick) {
-      // If sick, increment duration
-      currentSickDuration++;
-      print("Pet has been sick for $currentSickDuration ticks.");
-    } else {
-      // Check if pet becomes sick this tick
-      if (_shouldGetSick()) {
-        currentlySick = true;
-        currentSickDuration = 1; // Start duration
-        print("Pet got sick!");
-      }
-    }
-    // --- End Sickness Logic Update ---
-
-    // --- Auto-Sleep Logic ---
-    if (!state.isSleeping && !state.isSick && state.happiness < 10) {
-      print("Pet is too unhappy, falling asleep...");
-      sleep(); // Call existing sleep method
-      // Note: This means the rest of the awake tick logic below won't run this tick
-      // because sleep() sets isSleeping, and the check below will catch it.
-    }
-    // --- End Auto-Sleep Logic ---
-
+    // Apply state changes common to both sleeping and awake
     state = state.copyWith(
       age: currentAge,
       lifeStage: currentStage,
       isSick: currentlySick,
       sickDuration: currentSickDuration,
-      carePoints: currentCarePoints, // Update care points
+      carePoints: currentCarePoints,
     );
 
     if (state.isSleeping) {
+      // Sleeping reduces tiredness
+      currentTiredness = (currentTiredness - 10).clamp(0, 100);
+
       state = state.copyWith(
-        hunger: (state.hunger + 0).clamp(
-          0,
-          100,
-        ), // No hunger increase while sleeping now
+        hunger: (state.hunger + 0).clamp(0, 100),
+        tiredness: currentTiredness,
       );
-      print(
-        "Tick... zZzZz (Age: ${state.age}, Hunger: ${state.hunger}, Sick: ${state.isSick ? '${state.sickDuration}t' : 'No'})",
-      );
-      _applySicknessEffects(); // Apply effects even if sleeping
+
+      print("Tick... zZzZz (Age: ${state.age}, Tiredness: ${state.tiredness})");
+      _applySicknessEffects();
       return;
     }
 
-    // Awake tick logic
+    // Awake tick logic - being awake makes pet gradually more tired
+    currentTiredness = (currentTiredness + 3).clamp(0, 100);
+
     state = state.copyWith(
       hunger: (state.hunger + 2).clamp(0, 100),
-      happiness: (state.happiness - 0).clamp(
-        0,
-        100,
-      ), // No base happiness decay (only from sickness/waking)
+      happiness: (state.happiness - 0).clamp(0, 100),
       cleanliness: (state.cleanliness - 1).clamp(0, 100),
+      tiredness: currentTiredness,
     );
 
     _applySicknessEffects();
 
     print(
-      "Tick! Alive:${state.isAlive} Age:${state.age} Stage:${state.lifeStage.name} H:${state.hunger} Ha:${state.happiness} C:${state.cleanliness} Sick:${state.isSick ? '${state.sickDuration}t' : 'No'} Care:${state.carePoints}",
+      "Tick! Alive:${state.isAlive} Age:${state.age} T:${state.tiredness} Stage:${state.lifeStage.name} H:${state.hunger} Ha:${state.happiness} C:${state.cleanliness} Sick:${state.isSick ? '${state.sickDuration}t' : 'No'} Care:${state.carePoints}",
     );
   }
 
